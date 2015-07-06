@@ -10,6 +10,8 @@ import (
 	"encoding/json"
 	"strconv"
 	"errors"
+	"fmt"
+	"unicode"
 )
 
 type azurestorage struct{
@@ -59,6 +61,19 @@ func getValue(stats info.ContainerStats,p []string) (float64,string){
 	return 0,""
 }
 
+func formatKey(key string )string{
+	newkey:=""
+	for i:=range(key){
+		if unicode.IsLetter(rune(i)){
+			newkey+=string(i)
+		}else if unicode.IsNumber(rune(i)){
+			newkey+=string(i)
+		}else{
+			newkey+=fmt.Sprintf("%04X",i)
+		}
+	}
+	return newkey
+}
 func (self *azurestorage) AddStats(ref info.ContainerReference, stats *info.ContainerStats) error {
 	if stats == nil {
 		return nil
@@ -67,9 +82,10 @@ func (self *azurestorage) AddStats(ref info.ContainerReference, stats *info.Cont
 	for _,p:= range([]string{"Cpu.LoadAverage","Cpu.Usage.Total","Memory.ContainerData.Pgfault","Memory.ContainerData.Pgmajfault"}){
 		var err string
 		row:= AzureRow{}
+	
 		row.PartitionKey=self.machine_name
-		row.RowKey=strconv.FormatUint(uint64(time.Now().Unix()),10)+"_"+ref.Name+"_"+p
-		row.Value,err = getValue(info.ContainerStats{},strings.Split(p,"."))
+		row.RowKey=strconv.FormatUint(uint64(time.Now().Unix()),10)+"_"+formatKey(ref.Name)+"_"+p
+		row.Value,err = getValue(*stats,strings.Split(p,"."))
 		if len(err) >0 {
 			return errors.New(err)
 		}
