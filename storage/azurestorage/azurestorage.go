@@ -2,7 +2,7 @@ package azurestorage
 
 import (
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/qingfuw/azure-sdk-for-go/storage"
+	"github.com/qingfuwang/azure-sdk-for-go/storage"
 	"time"
 	"reflect"
 	"strings"
