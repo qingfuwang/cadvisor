@@ -1,6 +1,7 @@
 package azurestorage
 
 import (
+
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/qingfuwang/azure-sdk-for-go/storage"
 	"time"
@@ -12,15 +13,19 @@ import (
 )
 
 type azurestorage struct{
-	table storage.Table
+	datatable storage.Table
 	machine_name string
 	dataChan chan AzureRow
+	
 }
 func New( accountName string, accountKey string , tableName string, machine_name string)(*azurestorage){
 	s:= azurestorage{}
-	s.table,_ = storage.CreateTable(accountName,accountKey,tableName)
+	s.datatable,_ = storage.CreateTable(accountName,accountKey,tableName)
 	s.dataChan = make (chan AzureRow)
 	s.machine_name = machine_name
+	go func(){
+		s.uploadData()
+	}()
 	return &s
 }
 func (self *azurestorage) Close() error {
@@ -63,34 +68,33 @@ func (self *azurestorage) AddStats(ref info.ContainerReference, stats *info.Cont
 		var err string
 		row:= AzureRow{}
 		row.PartitionKey=self.machine_name
-		row.RowKey=strconv.FormatUint(uint64(time.Now().Unix()),10)+"_"+ref.Name+p
+		row.RowKey=strconv.FormatUint(uint64(time.Now().Unix()),10)+"_"+ref.Name+"_"+p
 		row.Value,err = getValue(info.ContainerStats{},strings.Split(p,"."))
 		if len(err) >0 {
 			return errors.New(err)
 		}
 		row.CounterName = p
 		self.dataChan<-row
-	}
-	
-	
+	}	
 	return nil;
 }
 
 func (self *azurestorage) uploadData()  {
-	var batch = make([][]byte,100)
+	var batch = make([][]byte,0)
 	var flush = time.Tick(time.Second*5)
 	for{
 		select{
 			case _=<-flush:
 				if len(batch)>0{
-					self.table.Insert(batch)
+					self.datatable.Insert(batch)
+					batch=make([][]byte,0)
 				}			
 				break
 			case row:=<-self.dataChan:
 				d,_:=json.Marshal(row)
 				batch=append(batch,d)
 				if len(batch)>=100{
-					self.table.Insert(batch)
+					self.datatable.Insert(batch)
 				}
 		}
 	}	
